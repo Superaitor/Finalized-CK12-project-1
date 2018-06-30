@@ -1,9 +1,10 @@
-#from word_2_vec import cleanup
+# from word_2_vec import cleanup
 import pickle
 from scipy.spatial.distance import cosine
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
 from nltk import pos_tag
+
 
 def main3(word):
     # main()
@@ -29,7 +30,7 @@ def cleanup(file):
 def noun_finder(file):
     x = list()
     for words in file:
-        if words[1] == "NN":
+        if words[1] == "NN" or words[1] == "NNP" or words[1] == "NNS":
             x.append(words[0])
     return x
 
@@ -48,22 +49,24 @@ def nearest_neighbors(k, files):
         if words[1] == "NN" or words[1] == "NNP":
             nouns.append(words[0])
     for words in nouns:
-            try:
-                total_similarities.update({(1 - cosine(word_vectors[words], word_vectors[k])): words})
-                numbers.append(1 - cosine(word_vectors[words], word_vectors[k]))
-            except KeyError:
-                pass
+        try:
+            total_similarities.update({(1 - cosine(word_vectors[words], word_vectors[k])): words})
+            numbers.append(1 - cosine(word_vectors[words], word_vectors[k]))
+        except KeyError:
+            pass
 
     numbers.sort(reverse=True)
     n = 0
     while n < 4:
         try:
-            if stemmer.stem(total_similarities[numbers[n + 10]]) == stemmer.stem(k) :
+            if stemmer.stem(total_similarities[numbers[n + 10]].lower()) == stemmer.stem(k.lower()) or k.lower() in \
+                    total_similarities[numbers[n + 10]].lower():
                 neighbors.append(total_similarities[numbers[n + 20]])
                 n += 1
-                continue
+                # continue
             for words in neighbors:
-                if stemmer.stem(total_similarities[numbers[n + 10]]) == stemmer.stem(words):
+                if stemmer.stem(total_similarities[numbers[n + 10]].lower()) == stemmer.stem(
+                        words.lower()) or words.lower() in total_similarities[numbers[n + 10]].lower():
                     neighbors.append(total_similarities[numbers[n + 20]])
             else:
                 neighbors.append(total_similarities[numbers[n + 10]])
@@ -71,3 +74,4 @@ def nearest_neighbors(k, files):
         except KeyError:
             pass
     return neighbors
+
