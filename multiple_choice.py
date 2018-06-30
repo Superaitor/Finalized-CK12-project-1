@@ -38,7 +38,7 @@ def main2():
 
     i = input("Press 'm' for multiple choice or 'b' for fill in the blank questions")
     # if i == "b":
-    #    fill_in_the_blank(wordz, text)
+    # fill_in_the_blank(wordz, text)
 
     if i == "m":
         multiple_choices(wordz, summary_string)
