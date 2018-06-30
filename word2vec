@@ -1,21 +1,12 @@
 import csv
 import nltk
-import pickle
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 import gensim, logging
 from scipy.spatial.distance import cosine
-from gensim import corpora, models
-import re
-from bs4 import BeautifulSoup, BeautifulStoneSoup, BeautifulSoup, Tag
-import re
+from gensim import corpora
 import six
 import os
-from google.cloud import language
-from google.cloud.language import enums
-from google.cloud.language import types
-import sys
-import html2text
 import pickle
 from google.cloud import language
 from google.cloud.language import enums
@@ -43,7 +34,7 @@ def main(s, link):
     return u
 
 
-def cleanup(file):
+def cleanup(file):  # cleans up the text, getting rid of symbols that may negatively affect the code and add no meaning
     x = list()
     y = list()
     stop_words = set(stopwords.words('ck12stopwords'))
@@ -57,7 +48,7 @@ def cleanup(file):
     return z
 
 
-def year_recognizer(file):
+def year_recognizer(file):  # Recognizes numbers from 100 to 2500, which in most of the cases, will be years.
     repeats = list()
     years = list()
     for words in file:
@@ -68,71 +59,17 @@ def year_recognizer(file):
     return years
 
 
-def noun_finder(file):
+def noun_finder(file):  # finds nouns (or potentially other POS if added to code)
     x = list()
     for words in file:
-        if words[1] == "NN":
+        if words[1] == "NN" or words[1] == "NNP" or words[1] == "NNS":
             x.append(words[0])
     return x
 
 
-def word2vec(file, topic, key, years, ents):
-    x = list()
-    repeats = list()
-    n = 0
-    total_similarities = list()
-
-    for w in key:
-        topic.append(w)
-
-    fd = open('word_vectors.pkl', 'rb')
-    word_vectors = pickle.load(fd)
-
-    while n < len(topic):
-        i = 0
-        for words in file:
-            if words not in repeats and words in word_vectors:
-                repeats.append(words)
-                if n == 0:
-                    total_similarities.append(1 - cosine(word_vectors[words], word_vectors[topic[n]]))
-                else:
-                    total_similarities[i] += cosine(1 - word_vectors[words], word_vectors[topic[n]])
-                i += 1
-        n += 1
-    for s in total_similarities:
-        s /= len(topic)
-
-    repeats = list()
-    i = 0
-    for words in file:
-        if words not in repeats and words in word_vectors:
-            repeats.append(words)
-            if total_similarities[i] > 0.3 or words in key:
-                x.append(words)
-            i += 1
-    for numbers in years:
-        x.append(numbers)
-    for entities in ents:
-        x.append(entities[0])
-    return x
-
-
-def tester():
-    model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
-    x = model.similarity('Pharmacogenomics', 'polymerase')
-    print(x)
-
-
-def lda(file):
-    dictionary = corpora.Dictionary(file)
-    corpus = [dictionary.doc2bow(text) for text in file]
-    l_d_a = gensim.models.ldamodel.LdaModel
-    ldamodel = l_d_a(corpus, num_topics=1, id2word=dictionary, passes=50)
-    topics = ldamodel.print_topics(num_topics=1, num_words=3)
-    return topics
-
-
-def array_splitter(file):
+def array_splitter(file):  # splits the entire list of words into groups of 5, which is done so these groups can be
+    # treated as separate documents that LDA can run through (LDA requires more than one document,
+    # and since there is only one document being inputed, I split that document into groups)
     size = len(file)
     dubs = []
     adder = []
@@ -150,10 +87,20 @@ def array_splitter(file):
         n += 1
         dubs.append(adder)
         adder = []
+
     return dubs
 
 
-def topic_sorter(topics):
+def lda(file):  # Runs LDA, finding the best topics most closely related to the text
+    dictionary = corpora.Dictionary(file)
+    corpus = [dictionary.doc2bow(text) for text in file]
+    l_d_a = gensim.models.ldamodel.LdaModel
+    ldamodel = l_d_a(corpus, num_topics=1, id2word=dictionary, passes=50)
+    topics = ldamodel.print_topics(num_topics=1, num_words=3)
+    return topics
+
+
+def topic_sorter(topics):  # Extracts the LDA topics into a list
     splitter = ""
     ind = 0
     tops = []
@@ -184,7 +131,68 @@ def topic_sorter(topics):
     return tops
 
 
-def keywords(file_name):
+def word2vec(file, topic, key, years, ents):  # Returns the most similar words to the topics found by LDA
+    x = list()
+    repeats = list()
+    n = 0
+    total_similarities = list()
+
+    fd = open('word_vectors.pkl', 'rb')
+    word_vectors = pickle.load(fd)
+
+    while n < len(topic):
+        i = 0
+        repeats = list()
+        for words in file:
+            if words.lower() not in repeats and words in word_vectors:
+                repeats.append(words.lower())
+                if n == 0:
+                    total_similarities.append(1 - cosine(word_vectors[words], word_vectors[topic[n]]))
+                else:
+                    total_similarities[i] += cosine(1 - word_vectors[words], word_vectors[topic[n]])
+                    # print(cosine(1 - word_vectors[words], word_vectors[topic[n]]))
+                i += 1
+
+        n += 1
+    for s in total_similarities:
+        s /= len(topic)
+
+    for w in key:
+        topic.append(w)
+
+    check = 2.5
+    while len(x) <= 5 or len(x) > 10:
+        i = 0
+        repeats = list()
+        x = list()
+        for words in file:
+            if words.lower() not in repeats and words in word_vectors:
+                repeats.append(words.lower())
+                if total_similarities[i] >= check or words in key:
+                    x.append(words)
+                i += 1
+        if len(x) <= 5:
+            check -= 0.01
+        if len(x) > 10:
+            check += 0.01
+
+
+
+    for numbers in years:
+        x.append(numbers)
+    for entities in ents:
+        x.append(entities[0])
+    return x
+
+
+def tester():  # Just a tester for word2vec, ignore
+    model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
+    x = model.similarity('Pharmacogenomics', 'polymerase')
+    print(x)
+
+
+def keywords(file_name):  # from the ck12 database, finds the lesson number being used, and extracts the lesson topic(s)
+    # associated with that lesson, adding those to the topics found by LDA
     array = list()
     multiplier = 1
     name = str(file_name)
@@ -206,7 +214,8 @@ def keywords(file_name):
     return keys
 
 
-def entity_recognizer(clean):
+def entity_recognizer(clean):  # Recognizes Entities, specifically names of people and places, to be added into the
+    # question making process
     text = ""
     for words in clean:
         text += words[0] + " "
@@ -261,8 +270,9 @@ def entity_recognizer(clean):
     return better_categories
 
 
-def printer(file):
+def printer(file):  # if only finding key words, this can be used (with tweaked code) to print those keywords
     for words in file:
         print(words)
 
 # main()
+
