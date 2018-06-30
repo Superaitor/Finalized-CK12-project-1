@@ -1,5 +1,4 @@
 from random import randint
-
 import enchant
 from bs4 import BeautifulSoup
 from nltk import word_tokenize
@@ -9,10 +8,10 @@ from sumy.nlp.tokenizers import Tokenizer
 from sumy.parsers.html import HtmlParser
 from sumy.summarizers.text_rank import TextRankSummarizer as TextSummarizer
 from sumy.utils import get_stop_words
-
 from Most_Similar import main3
 from word_2_vec import main
 from years_define import year_definitions
+from nltk.stem.snowball import SnowballStemmer
 
 
 def main2():
@@ -22,7 +21,6 @@ def main2():
     r = str(z)
     xhtml = things.read()
     summary = get_summary(xhtml)
-
     # s = input("enter link of text you want to find key words of(TEXT): ")
     # f = open(s, "r")
     # r = f.read()
@@ -71,7 +69,7 @@ def fill_in_the_blank(x, text):
                     break
                 if answer == "n":
                     break
-                else:
+                if answer != q and answer != "s" and answer != "n":
                     print("Try again!")
             else:
                 definition = year_definitions(q, text)
@@ -92,6 +90,7 @@ def fill_in_the_blank(x, text):
 
 
 def multiple_choices(x, text):
+    stemmer = SnowballStemmer("english")
     d = enchant.Dict("en_US")
     wrong = 0
     incorrect = list()
@@ -100,16 +99,20 @@ def multiple_choices(x, text):
     tester = m
     words = list()
     end = False
-
+    iterations = 0
     while n > 0 and end is False:
         random = randint(0, len(x) - 1)
         if x[random] not in words:
             words.append(x[random])
             n -= 1
+        iterations += 1
+        if iterations > 100:
+            n -= 1
+            iterations = 0
     print("Length:")
     print(len(words))
     for w in words:
-        print(w)
+        # print(w)
         count = 0
         a = []
         correct_answer = " "
@@ -124,41 +127,53 @@ def multiple_choices(x, text):
                     a.append(str(randint(int(w) - 50, int(w) + 50)))
                     it += 1
         lgth = 3
+        wd = 2
+        stemmed = list()
         if len(a) > 2:
             while lgth >= 0:
                 r = randint(0, 4)
-                if answers[r] is None:
+                while wd > 0 and answers[r] is None:
+                    rand = randint(0, len(words) - 1)
+                    if stemmer.stem(words[rand].lower()) != stemmer.stem(w.lower()) and stemmer.stem(
+                            words[rand].lower()) not in stemmed:
+                        answers[r] = words[rand].lower()
+                        stemmed.append(stemmer.stem(words[rand].lower()))
+                        lgth -= 1
+                    wd -= 1
+                if answers[r] is None and a[lgth] not in answers:
                     answers[r] = a[lgth]
                     lgth -= 1
-        x = 0
+                if a[lgth] in answers:
+                    answers[r] = a[lgth + 1]
+        cnt = 0
         output = list()
         if len(a) > 1:
-            while x < len(answers):
-                if x == 0:
-                    output.append("a) " + answers[x])
-                    if answers[x] == w:
+            while cnt < len(answers):
+                if cnt == 0:
+                    output.append(" " + answers[cnt])
+                    if answers[cnt] == w:
                         correct_answer = "a"
-                    x += 1
-                if x == 1:
-                    output.append("\nb) " + answers[x])
-                    if answers[x] == w:
+                    cnt += 1
+                if cnt == 1:
+                    output.append("\n " + answers[cnt])
+                    if answers[cnt] == w:
                         correct_answer = "b"
-                    x += 1
-                if x == 2:
-                    output.append("\nc) " + answers[x])
-                    if answers[x] == w:
+                    cnt += 1
+                if cnt == 2:
+                    output.append("\n " + answers[cnt])
+                    if answers[cnt] == w:
                         correct_answer = "c"
-                    x += 1
-                if x == 3:
-                    output.append("\nd) " + answers[x])
-                    if answers[x] == w:
+                    cnt += 1
+                if cnt == 3:
+                    output.append("\n " + answers[cnt])
+                    if answers[cnt] == w:
                         correct_answer = "d"
-                    x += 1
-                if x == 4:
-                    output.append("\ne) " + answers[x])
-                    if answers[x] == w:
+                    cnt += 1
+                if cnt == 4:
+                    output.append("\n " + answers[cnt])
+                    if answers[cnt] == w:
                         correct_answer = "e"
-                    x += 1
+                    cnt += 1
         t = False
         while t is False:
             # y = wn.synsets(w)
@@ -175,7 +190,7 @@ def multiple_choices(x, text):
                     sol = ""
                     index += 1
                     if wordz.lower() == w.lower():
-                        keyz = wordz
+                        keyz = wordz.lower()
                         index -= 1
                         point = "o"
                         instance = 0
@@ -193,27 +208,36 @@ def multiple_choices(x, text):
                         while final_words != "." and final_words != "?" and instance < 2 and "." not in words:
                             if final_words == ":" or final_words == ";":
                                 instance += 1
-                            sol += all_words[info + adds] + " "
-                            final_words = all_words[info + adds]
+                            sol += all_words[info + adds].lower() + " "
+                            final_words = all_words[info + adds].lower()
                             adds += 1
 
                         break
 
                 check = word_tokenize(sol)
-                if "[" in check[0].lower():
-                    break
                 if len(check) < 1:
+                    break
+                if "[" in check[0].lower() or "identify" in check[0].lower() or "what" in check[
+                    0].lower() or "explain" in check[0].lower() or "how" in check[0].lower():
                     break
                 xy = 0
                 while xy < len(check):
                     if check[xy] == keyz:
-                        check[xy] = "-----?-----"
-                        break
+                        if check[xy - 1] == "a" or check[xy - 1] == "an":
+                            check[xy - 1] = "a(n)"
                     xy += 1
+                xy = 0
+                while keyz in check:
+                    while xy < len(check):
+                        if check[xy] == keyz:
+                            check[xy] = "-----?-----"
+                            break
+                        xy += 1
+
                 solution = ""
                 b = 0
                 while b < len(check) - 1:
-                    if check[b + 1] is "." or check[b + 1] is "," or check[b + 1] is ")":
+                    if check[b + 1] is "." or check[b + 1] is "," or check[b + 1] is ")" or check[b + 1] == '"':
                         solution += check[b]
                     else:
                         solution += check[b] + " "
@@ -285,3 +309,4 @@ def get_summary(xhtml):
 
 
 main2()
+
