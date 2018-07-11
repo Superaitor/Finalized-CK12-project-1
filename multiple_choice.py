@@ -135,7 +135,8 @@ def multiple_choices(x, text):
                 while wd > 0 and answers[r] is None:
                     rand = randint(0, len(words) - 1)
                     if stemmer.stem(words[rand].lower()) != stemmer.stem(w.lower()) and stemmer.stem(
-                            words[rand].lower()) not in stemmed:
+                            words[rand].lower()) not in stemmed and w.isdigit() is False and words[
+                        rand].isdigit() is False:
                         answers[r] = words[rand].lower()
                         stemmed.append(stemmer.stem(words[rand].lower()))
                         lgth -= 1
